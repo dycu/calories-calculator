@@ -199,3 +199,7 @@ table.nutrition thead th { font-size: 0.78rem; color: var(--muted); font-weight:
 .top .row { gap: 2px; }
 .save-status { white-space: nowrap; }
 @media (max-width: 420px) { .top .ghost { font-size: 0.92rem; } }
+
+.copy-last { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-bottom: 12px; }
+.copy-last button { flex: none; }
+.copy-fallback { width: 100%; margin-top: 6px; }

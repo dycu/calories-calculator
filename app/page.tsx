@@ -14,6 +14,7 @@ import {
   previousMeals,
 } from "@/lib/storage";
 import { countOf, formatDate, formatDateTime } from "@/lib/pl";
+import { hasSummary, mealSummaryText } from "@/lib/summary";
 import { NUTRIENTS, type Ingredient, type Meal, type NutrientKey, type Source } from "@/lib/types";
 
 /** A per-100 g value in an ingredient summary: decimal comma, "?" when unknown. */
@@ -168,6 +169,9 @@ export default function Home() {
     return <MealPicker meals={previousMeals(meals)} onPick={create} onCancel={() => setPicking(false)} />;
   }
 
+  // Newest meal that has nutrition values (the list is newest first).
+  const latest = meals.find(hasSummary);
+
   return (
     <main className="wrap">
       <header className="top">
@@ -192,6 +196,14 @@ export default function Home() {
         </div>
       </header>
       {notice && <p className="banner small">{notice}</p>}
+      {latest && (
+        <div className="copy-last">
+          <CopySummaryButton meal={latest} label="📋 Kopiuj ostatni posiłek" />
+          <span className="muted small">
+            {latest.name.trim() || "Posiłek bez nazwy"} · {formatDate(latest.createdAt)} · tabela + waga całości
+          </span>
+        </div>
+      )}
       {meals.length === 0 && (
         <p className="muted empty">
           No meals yet. Add one, list its ingredients with weights, and let the AI work out the calories.
@@ -643,6 +655,9 @@ function MealEditor({
             {[...totals.incomplete].some((k) => totals.known.has(k)) && (
               <p className="muted small">* Części składników brakuje wagi lub tej wartości, więc wynik jest zaniżony.</p>
             )}
+            <div className="row wrap-row">
+              <CopySummaryButton meal={meal} label="📋 Kopiuj tabelę i wagę" />
+            </div>
           </>
         )}
         {meal.aiNotes && <p className="notes">{meal.aiNotes}</p>}
@@ -829,5 +844,33 @@ function PhotoRecipe({
       {error && <p className="error">{error}</p>}
       {meal.ingredients.length === 0 && <p className="muted small or">…albo dodawaj składniki pojedynczo:</p>}
     </div>
+  );
+}
+
+/** Copies the meal's nutrition table + total weight as text; shows the text if the clipboard is blocked. */
+function CopySummaryButton({ meal, label }: { meal: Meal; label: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const text = mealSummaryText(meal);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setState("copied");
+      setTimeout(() => setState("idle"), 2000);
+    } catch {
+      setState("failed");
+    }
+  }
+
+  return (
+    <>
+      <button onClick={copy}>{state === "copied" ? "Skopiowano ✓" : label}</button>
+      {state === "failed" && (
+        <div className="copy-fallback">
+          <p className="error small">Brak dostępu do schowka — zaznacz tekst i skopiuj ręcznie:</p>
+          <textarea readOnly value={text} rows={11} onFocus={(e) => e.currentTarget.select()} />
+        </div>
+      )}
+    </>
   );
 }

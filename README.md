@@ -10,6 +10,8 @@ Aplikacja do zapisywania domowych posiłków i ich pełnych wartości odżywczyc
 
 **Ponowne robienie posiłku:** stuknij **+ Nowy posiłek** i wybierz wcześniejszy posiłek, wpisz nazwę wcześniejszego posiłku i stuknij **Użyj ponownie** albo stuknij **Zrób ponownie** w otwartym posiłku. Kopiują się notatki, składniki, wagi i wartości odżywcze – popraw wagi i zważ gotowy posiłek.
 
+**Kopiowanie do AI:** przycisk **📋 Kopiuj ostatni posiłek** na ekranie głównym (i **📋 Kopiuj tabelę i wagę** w każdym posiłku) kopiuje tabelę wartości odżywczych – dla całego posiłku i na 100 g – razem z wagą całości, jako zwykły tekst do wklejenia w czacie z AI.
+
 Aplikacja jest chroniona hasłem, a posiłki są zapisywane na serwerze w bazie Upstash Redis, więc są takie same na każdym urządzeniu.
 
 ## Uruchomienie lokalne
