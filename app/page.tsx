@@ -169,9 +169,6 @@ export default function Home() {
     return <MealPicker meals={previousMeals(meals)} onPick={create} onCancel={() => setPicking(false)} />;
   }
 
-  // Newest meal that has nutrition values (the list is newest first).
-  const latest = meals.find(hasSummary);
-
   return (
     <main className="wrap">
       <header className="top">
@@ -196,14 +193,6 @@ export default function Home() {
         </div>
       </header>
       {notice && <p className="banner small">{notice}</p>}
-      {latest && (
-        <div className="copy-last">
-          <CopySummaryButton meal={latest} label="📋 Kopiuj ostatni posiłek" />
-          <span className="muted small">
-            {latest.name.trim() || "Posiłek bez nazwy"} · {formatDate(latest.createdAt)} · tabela + waga całości
-          </span>
-        </div>
-      )}
       {meals.length === 0 && (
         <p className="muted empty">
           No meals yet. Add one, list its ingredients with weights, and let the AI work out the calories.
@@ -213,7 +202,7 @@ export default function Home() {
         {meals.map((m) => {
           const t = mealTotals(m);
           return (
-            <li key={m.id}>
+            <li key={m.id} className="meal-row">
               <button className="meal-card" onClick={() => setOpenId(m.id)}>
                 <span className="meal-name">{m.name || "Posiłek bez nazwy"}</span>
                 <span className="muted small">
@@ -239,6 +228,7 @@ export default function Home() {
                   )}
                 </span>
               </button>
+              {hasSummary(m) && <CopySummaryButton meal={m} compact />}
             </li>
           );
         })}
@@ -848,7 +838,7 @@ function PhotoRecipe({
 }
 
 /** Copies the meal's nutrition table + total weight as text; shows the text if the clipboard is blocked. */
-function CopySummaryButton({ meal, label }: { meal: Meal; label: string }) {
+function CopySummaryButton({ meal, label, compact }: { meal: Meal; label?: string; compact?: boolean }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
   const text = mealSummaryText(meal);
 
@@ -864,7 +854,18 @@ function CopySummaryButton({ meal, label }: { meal: Meal; label: string }) {
 
   return (
     <>
-      <button onClick={copy}>{state === "copied" ? "Skopiowano ✓" : label}</button>
+      {compact ? (
+        <button
+          className="copy-icon"
+          title="Kopiuj tabelę i wagę całości"
+          aria-label={`Kopiuj tabelę i wagę: ${meal.name || "posiłek bez nazwy"}`}
+          onClick={copy}
+        >
+          {state === "copied" ? "✓" : "📋"}
+        </button>
+      ) : (
+        <button onClick={copy}>{state === "copied" ? "Skopiowano ✓" : label}</button>
+      )}
       {state === "failed" && (
         <div className="copy-fallback">
           <p className="error small">Brak dostępu do schowka — zaznacz tekst i skopiuj ręcznie:</p>
