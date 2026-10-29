@@ -1,5 +1,6 @@
 import { get, set } from "idb-keyval";
-import type { Meal } from "./types";
+import { emptyNutrients } from "./calc";
+import type { Ingredient, Meal, Source } from "./types";
 
 // Before meals were stored on the server they lived in the browser's IndexedDB.
 // They are uploaded once after logging in, then the local copy is marked done.
@@ -9,7 +10,7 @@ const MIGRATED_KEY = "meals-v1-uploaded";
 export async function loadLegacyMeals(): Promise<Meal[]> {
   try {
     if (await get(MIGRATED_KEY)) return [];
-    return (await get<Meal[]>(LEGACY_KEY)) ?? [];
+    return ((await get<unknown[]>(LEGACY_KEY)) ?? []).map(normalizeMeal);
   } catch {
     return []; // IndexedDB unavailable (e.g. private mode): nothing to migrate
   }
@@ -31,7 +32,28 @@ export function newMeal(): Meal {
     totalWeight: null,
     aiNotes: "",
     calculatedAt: null,
-    targetKcal: null,
+  };
+}
+
+/**
+ * Bring a stored meal up to the current shape. Meals saved before full
+ * nutrition tracking only had kcalPer100g / kcalSource per ingredient.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function normalizeMeal(raw: any): Meal {
+  const { targetKcal: _drop, ...meal } = raw;
+  return {
+    ...meal,
+    ingredients: (raw.ingredients ?? []).map((i: any): Ingredient => {
+      if (i.per100g) return { ...i, manual: i.manual ?? [] };
+      const { kcalPer100g, kcalSource, ...rest } = i;
+      return {
+        ...rest,
+        per100g: { ...emptyNutrients(), kcal: kcalPer100g ?? null },
+        source: (["label", "estimate", "saved"].includes(kcalSource) ? kcalSource : null) as Source | null,
+        manual: kcalSource === "manual" ? ["kcal"] : [],
+      };
+    }),
   };
 }
 
@@ -45,7 +67,6 @@ export function mealFromPrevious(src: Meal): Meal {
     ...newMeal(),
     name: src.name,
     description: src.description ?? "",
-    targetKcal: src.targetKcal,
     ingredients: src.ingredients.map((i) => ({ ...i, id: newId(), hasPhoto: false })),
   };
 }

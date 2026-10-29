@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { gramsForKcal, ingredientKcal, mealTotals, round } from "@/lib/calc";
+import { emptyNutrients, fmt, ingredientAmount, mealTotals, missingNutrients, per100gOfMeal, round } from "@/lib/calc";
 import { buildPrompt, parseReply } from "@/lib/prompt";
 import { deleteMeal, fetchMeals, logout, putMeal, uploadMeals } from "@/lib/api";
 import {
@@ -13,7 +13,7 @@ import {
   newMeal,
   previousMeals,
 } from "@/lib/storage";
-import type { Ingredient, KcalSource, Meal } from "@/lib/types";
+import { NUTRIENTS, type Ingredient, type Meal, type NutrientKey, type Source } from "@/lib/types";
 
 const num = (v: string): number | null => {
   const n = parseFloat(v.replace(",", "."));
@@ -195,10 +195,14 @@ export default function Home() {
                   {new Date(m.createdAt).toLocaleDateString()} · {m.ingredients.length} ingredients
                 </span>
                 <span className="meal-kcal">
-                  {t.totalKcal > 0 ? (
+                  {t.known.has("kcal") ? (
                     <>
-                      <strong>{round(t.totalKcal)} kcal</strong>
-                      {t.kcalPer100g && <span className="muted small"> · {round(t.kcalPer100g)} kcal/100 g</span>}
+                      <strong>{fmt("kcal", t.total.kcal)} kcal</strong>
+                      <br />
+                      <span className="muted small">
+                        per 100 g: {fmt("kcal", per100gOfMeal(t, "kcal") ?? 0)} kcal
+                        {t.known.has("protein") && ` · ${fmt("protein", per100gOfMeal(t, "protein") ?? 0)} g protein`}
+                      </span>
                     </>
                   ) : (
                     <span className="muted small">not calculated</span>
@@ -258,7 +262,7 @@ function MealPicker({
                     m.ingredients.map((i) => i.name).filter(Boolean).join(", ")}
                 </span>
                 <span className="meal-kcal small muted">
-                  {t.kcalPer100g ? `${round(t.kcalPer100g)} kcal/100 g` : ""}
+                  {t.known.has("kcal") ? `${fmt("kcal", per100gOfMeal(t, "kcal") ?? 0)} kcal/100 g` : ""}
                   <br />
                   last {new Date(m.createdAt).toLocaleDateString()}
                 </span>
@@ -298,12 +302,12 @@ function MealEditor({
   const totals = mealTotals(meal);
   const previous = findPrevious(allMeals, meal);
 
-  // Ingredients with a known kcal/100g from earlier meals, for autocomplete.
+  // Ingredients with known nutrition from earlier meals, for autocomplete.
   const library = useMemo(() => {
     const map = new Map<string, Ingredient>();
     for (const m of [...allMeals].reverse()) {
       for (const i of m.ingredients) {
-        if (i.name.trim() && i.kcalPer100g != null) map.set(i.name.trim().toLowerCase(), i);
+        if (i.name.trim() && i.per100g.kcal != null) map.set(i.name.trim().toLowerCase(), i);
       }
     }
     return map;
@@ -317,23 +321,38 @@ function MealEditor({
     set({
       ingredients: [
         ...meal.ingredients,
-        { id: newId(), name: "", grams: null, kcalPer100g: null, kcalSource: null, note: "", hasPhoto: false },
+        {
+          id: newId(),
+          name: "",
+          grams: null,
+          per100g: emptyNutrients(),
+          source: null,
+          manual: [],
+          note: "",
+          hasPhoto: false,
+        },
       ],
     });
   }
 
   function fillFromLibrary(ing: Ingredient) {
-    if (ing.kcalPer100g != null) return;
+    if (missingNutrients(ing).length === 0) return;
     const known = library.get(ing.name.trim().toLowerCase());
-    if (known) {
-      setIngredient(ing.id, { kcalPer100g: known.kcalPer100g, kcalSource: "saved", note: "From an earlier meal" });
-    }
+    if (!known) return;
+    // Keep anything already typed in; fill the gaps from the earlier meal.
+    const per100g = { ...ing.per100g };
+    for (const { key } of NUTRIENTS) per100g[key] ??= known.per100g[key];
+    setIngredient(ing.id, { per100g, source: "saved", note: "From an earlier meal" });
   }
 
-  // Ingredients the AI should look at: those without a value, those with a package
-  // photo not yet read (the label beats any estimate), or everything when re-checking.
+  // Ingredients the AI should look at: those with missing values, those with a package
+  // photo not yet read (the label beats any other source), or everything when re-checking.
   const toAsk = meal.ingredients.filter(
-    (i) => i.name.trim() && (recheckAll || i.kcalPer100g == null || (i.hasPhoto && i.kcalSource !== "label")),
+    (i) =>
+      i.name.trim() &&
+      (recheckAll ||
+        missingNutrients(i).some((k) => !i.manual.includes(k)) ||
+        (i.hasPhoto && i.source !== "label")),
   );
   const prompt = toAsk.length ? buildPrompt(meal.name, meal.description ?? "", toAsk) : "";
 
@@ -365,7 +384,14 @@ function MealEditor({
         promptIds: [],
         ingredients: meal.ingredients.map((i) => {
           const r = byId.get(i.id);
-          return r ? { ...i, kcalPer100g: round(r.kcalPer100g, 0.1), kcalSource: r.source, note: r.note } : i;
+          if (!r) return i;
+          // The AI's values replace earlier ones, except values the user typed in.
+          const per100g = { ...i.per100g };
+          for (const { key } of NUTRIENTS) {
+            const v = r.values[key];
+            if (v != null && !i.manual.includes(key)) per100g[key] = v;
+          }
+          return { ...i, per100g, source: r.source, note: r.note };
         }),
       });
       setReply("");
@@ -374,8 +400,6 @@ function MealEditor({
       setError(e instanceof Error ? e.message : String(e));
     }
   }
-
-  const targetGrams = meal.targetKcal ? gramsForKcal(totals, meal.targetKcal) : null;
 
   return (
     <main className="wrap">
@@ -411,8 +435,8 @@ function MealEditor({
           <button
             className="primary"
             onClick={() => {
-              const { name, description, ingredients, targetKcal } = mealFromPrevious(previous);
-              onChange({ ...meal, name, description, ingredients, targetKcal });
+              const { name, description, ingredients } = mealFromPrevious(previous);
+              onChange({ ...meal, name, description, ingredients });
             }}
           >
             Reuse it
@@ -430,7 +454,8 @@ function MealEditor({
       <section className="card">
         <h2>1. Ingredients</h2>
         <p className="muted small">
-          Weigh each ingredient as it goes in. Tap 📷 if you’ll attach a photo of its nutrition label in the AI chat.
+          Weigh each ingredient as it goes in. Tap 📷 if you’ll attach a photo of its nutrition label in the AI chat;
+          the AI looks up the rest on the web.
         </p>
         <datalist id="known-ingredients">
           {[...library.values()].map((i) => (
@@ -473,11 +498,11 @@ function MealEditor({
       </section>
 
       <section className="card">
-        <h2>3. Calories</h2>
+        <h2>3. Nutrition</h2>
         {toAsk.length > 0 ? (
           <>
             <p className="muted small">
-              Copy the prompt into your AI chat (Claude, ChatGPT…)
+              Copy the prompt into your AI chat (Claude, ChatGPT… with web search on)
               {toAsk.some((i) => i.hasPhoto) && ", attach the package photos there"}, then paste its reply below.
             </p>
             <div className="row wrap-row">
@@ -504,7 +529,7 @@ function MealEditor({
           </>
         ) : (
           meal.ingredients.length > 0 && (
-            <p className="muted small">Every ingredient has kcal/100 g. Edit a value by hand, or re-check below.</p>
+            <p className="muted small">Every ingredient has all its values. Edit any by hand, or re-check below.</p>
           )
         )}
         <label className="check small recheck">
@@ -513,72 +538,69 @@ function MealEditor({
         </label>
         {error && <p className="error">{error}</p>}
 
-        {totals.totalKcal > 0 && (
-          <div className="result">
-            <div className="stat">
-              <span className="stat-value">{round(totals.totalKcal)}</span>
-              <span className="stat-label">kcal total{!totals.complete && " (incomplete)"}</span>
+        {totals.known.size > 0 && (
+          <>
+            <div className="result">
+              <div className="stat">
+                <span className="stat-value">{fmt("kcal", totals.total.kcal)}</span>
+                <span className="stat-label">kcal total</span>
+              </div>
+              <div className="stat">
+                <span className="stat-value">{fmt("kcal", per100gOfMeal(totals, "kcal") ?? 0)}</span>
+                <span className="stat-label">kcal / 100 g</span>
+              </div>
+              <div className="stat">
+                <span className="stat-value">{fmt("protein", per100gOfMeal(totals, "protein") ?? 0)}</span>
+                <span className="stat-label">g protein / 100 g</span>
+              </div>
             </div>
-            <div className="stat">
-              <span className="stat-value">{totals.kcalPer100g ? round(totals.kcalPer100g) : "–"}</span>
-              <span className="stat-label">kcal / 100 g of meal</span>
-            </div>
-            <div className="stat">
-              <span className="stat-value">{round(totals.mealWeight)}</span>
-              <span className="stat-label">g whole meal</span>
-            </div>
-          </div>
-        )}
-        {!totals.complete && totals.totalKcal > 0 && (
-          <p className="muted small">Some ingredients are missing grams or kcal/100 g, so the total is too low.</p>
+            <table className="nutrition">
+              <thead>
+                <tr>
+                  <th />
+                  <th>
+                    Whole meal
+                    <br />
+                    {round(totals.mealWeight)} g
+                  </th>
+                  <th>
+                    Per
+                    <br />
+                    100 g
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {NUTRIENTS.map((n) => {
+                  const per100 = per100gOfMeal(totals, n.key);
+                  const star = totals.incomplete.has(n.key) && totals.known.has(n.key) ? "*" : "";
+                  return (
+                    <tr key={n.key} className={"sub" in n ? "sub" : ""}>
+                      <th scope="row">{n.label}</th>
+                      <td>{per100 == null ? "–" : `${fmt(n.key, totals.total[n.key])} ${n.unit}${star}`}</td>
+                      <td>{per100 == null ? "–" : `${fmt(n.key, per100)} ${n.unit}${star}`}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {[...totals.incomplete].some((k) => totals.known.has(k)) && (
+              <p className="muted small">* Some ingredients are missing grams or this value, so it’s too low.</p>
+            )}
+          </>
         )}
         {meal.aiNotes && <p className="notes">{meal.aiNotes}</p>}
         {meal.calculatedAt && (
           <p className="muted small">AI reply applied {new Date(meal.calculatedAt).toLocaleString()}</p>
         )}
       </section>
-
-      <section className="card">
-        <h2>4. How much should I eat?</h2>
-        <label className="field">
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            placeholder="e.g. 500"
-            value={meal.targetKcal ?? ""}
-            onChange={(e) => set({ targetKcal: num(e.target.value) })}
-          />
-          <span>kcal</span>
-        </label>
-        <div className="row wrap-row">
-          {[300, 400, 500, 600, 700].map((k) => (
-            <button key={k} className="chip" onClick={() => set({ targetKcal: k })}>
-              {k}
-            </button>
-          ))}
-        </div>
-        {meal.targetKcal != null && meal.targetKcal > 0 && (
-          targetGrams ? (
-            <div className="portion">
-              Eat <strong>{round(targetGrams)} g</strong> of the meal
-              {totals.mealWeight > 0 && (
-                <span className="muted"> — {round((targetGrams / totals.mealWeight) * 100)}% of the whole meal</span>
-              )}
-              {targetGrams > totals.mealWeight && <p className="muted small">That’s more than the whole meal.</p>}
-            </div>
-          ) : (
-            <p className="muted small">Calculate the calories first.</p>
-          )
-        )}
-      </section>
     </main>
   );
 }
 
-const SOURCE_LABEL: Record<KcalSource, string> = {
-  manual: "manual",
+const SOURCE_LABEL: Record<Source, string> = {
   label: "from label",
+  web: "from web",
   estimate: "AI estimate",
   saved: "saved",
 };
@@ -594,7 +616,25 @@ function IngredientRow({
   onBlurName: () => void;
   onRemove: () => void;
 }) {
-  const kcal = ingredientKcal(ing);
+  const [expanded, setExpanded] = useState(false);
+  const kcal = ingredientAmount(ing, "kcal");
+  const missing = missingNutrients(ing).length;
+
+  function setValue(key: NutrientKey, value: number | null) {
+    const manual = ing.manual.filter((k) => k !== key);
+    onChange({ per100g: { ...ing.per100g, [key]: value }, manual: value == null ? manual : [...manual, key] });
+  }
+
+  const input = (key: NutrientKey) => (
+    <input
+      type="number"
+      inputMode="decimal"
+      min={0}
+      placeholder="?"
+      value={ing.per100g[key] ?? ""}
+      onChange={(e) => setValue(key, num(e.target.value))}
+    />
+  );
 
   return (
     <div className="ingredient">
@@ -630,19 +670,31 @@ function IngredientRow({
       </div>
       <div className="ing-meta">
         <label className="field compact">
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            placeholder="?"
-            value={ing.kcalPer100g ?? ""}
-            onChange={(e) => onChange({ kcalPer100g: num(e.target.value), kcalSource: "manual", note: "" })}
-          />
+          {input("kcal")}
           <span>kcal/100g</span>
         </label>
-        {ing.kcalSource && <span className={`badge ${ing.kcalSource}`}>{SOURCE_LABEL[ing.kcalSource]}</span>}
+        {ing.source && <span className={`badge ${ing.source}`}>{SOURCE_LABEL[ing.source]}</span>}
         <span className="ing-kcal">{kcal != null ? `${round(kcal)} kcal` : ""}</span>
       </div>
+      <button className="link small" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+        {expanded ? "▾" : "▸"} Nutrients per 100 g
+        {!expanded &&
+          (ing.per100g.protein != null || ing.per100g.fat != null || ing.per100g.carbs != null
+            ? ` · P ${ing.per100g.protein ?? "?"} · F ${ing.per100g.fat ?? "?"} · C ${ing.per100g.carbs ?? "?"}`
+            : "")}
+        {missing > 0 && <span className="muted"> ({missing} missing)</span>}
+      </button>
+      {expanded && (
+        <div className="nutrient-grid">
+          {NUTRIENTS.filter((n) => n.key !== "kcal").map((n) => (
+            <label key={n.key} className={`field compact${"sub" in n ? " sub" : ""}`}>
+              <span className="nutrient-label">{n.label}</span>
+              {input(n.key)}
+              <span>{n.unit}</span>
+            </label>
+          ))}
+        </div>
+      )}
       {ing.note && <p className="muted small ing-note">{ing.note}</p>}
     </div>
   );

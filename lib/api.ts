@@ -1,3 +1,4 @@
+import { normalizeMeal } from "./storage";
 import type { Meal } from "./types";
 
 async function call<T>(url: string, init?: RequestInit): Promise<T> {
@@ -11,7 +12,7 @@ async function call<T>(url: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
-export const fetchMeals = () => call<{ meals: Meal[] }>("/api/meals").then((d) => d.meals);
+export const fetchMeals = () => call<{ meals: unknown[] }>("/api/meals").then((d) => d.meals.map(normalizeMeal));
 
 export const uploadMeals = (meals: Meal[]) =>
   call("/api/meals", { method: "POST", body: JSON.stringify({ meals }) });

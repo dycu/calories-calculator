@@ -143,8 +143,6 @@ button.photo.on { opacity: 1; background: var(--accent-soft); border-color: var(
 .stat-value { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .stat-label { font-size: 0.78rem; color: var(--muted); }
 
-.portion { margin-top: 12px; font-size: 1.1rem; }
-.portion strong { font-size: 1.4rem; }
 
 @media (max-width: 420px) {
   .stat-value { font-size: 1.2rem; }
@@ -173,3 +171,19 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; marg
 .save-status { font-size: 0.8rem; color: var(--muted); }
 .save-status.error { color: var(--danger); }
 .banner { background: var(--warn-soft); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+
+button.link {
+  background: none; border: none; padding: 4px 0; min-height: 0;
+  color: var(--accent); text-align: left; margin-top: 4px;
+}
+.nutrient-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin-top: 6px; }
+.nutrient-grid .field { justify-content: space-between; }
+.nutrient-label { flex: 1; color: var(--text) !important; font-size: 0.85rem !important; white-space: normal !important; }
+.sub .nutrient-label, tr.sub th { padding-left: 10px; color: var(--muted) !important; font-weight: 400; }
+.badge.web { background: var(--info-soft); }
+table.nutrition { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.92rem; font-variant-numeric: tabular-nums; }
+table.nutrition td { white-space: nowrap; }
+table.nutrition th, table.nutrition td { padding: 6px 4px; border-bottom: 1px solid var(--border); text-align: right; }
+table.nutrition th[scope="row"] { text-align: left; font-weight: 600; }
+table.nutrition thead th { font-size: 0.78rem; color: var(--muted); font-weight: 600; }
+@media (max-width: 420px) { .nutrient-grid { grid-template-columns: 1fr; } }
