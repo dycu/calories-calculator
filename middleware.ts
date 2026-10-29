@@ -12,6 +12,7 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Everything except the login page/endpoint and Next's static assets.
-  matcher: ["/((?!login|api/login|_next/|favicon.ico).*)"],
+  // Everything except the login page/endpoint, Next's static assets, and the
+  // manifest + icons (the browser fetches those without the session cookie).
+  matcher: ["/((?!login|api/login|_next/|favicon.ico|manifest.webmanifest|icons/).*)"],
 };
