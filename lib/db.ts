@@ -6,19 +6,50 @@ const MEALS_KEY = "calories-calculator:meals"; // Redis hash: meal id -> meal JS
 
 let redis: Redis | null = null;
 
-export class DbNotConfiguredError extends Error {
-  constructor() {
-    super("No database connected. In Vercel, add an Upstash Redis database to this project under Storage.");
+export class DbNotConfiguredError extends Error {}
+
+/**
+ * Find Upstash connection details in the environment. Accepts the names Upstash
+ * uses (UPSTASH_REDIS_REST_URL/TOKEN), the names Vercel's integration uses
+ * (KV_REST_API_URL/TOKEN), the same with a custom prefix chosen when connecting
+ * the database in Vercel (e.g. STORAGE_KV_REST_API_URL), or a rediss:// URL to
+ * an Upstash host, whose password is the REST token.
+ */
+export function resolveDbConfig(env: Record<string, string | undefined>): { url: string; token: string } | null {
+  const names = Object.keys(env).sort((a, b) => a.length - b.length); // unprefixed names first
+  for (const urlName of names) {
+    const m = /^(.*(?:KV_REST_API|REDIS_REST))_URL$/.exec(urlName);
+    const token = m && env[`${m[1]}_TOKEN`];
+    if (m && env[urlName] && token) return { url: env[urlName]!, token };
   }
+  for (const name of names) {
+    if (!/(REDIS|KV)_URL$/.test(name) || !env[name]) continue;
+    try {
+      const u = new URL(env[name]!);
+      if (/^rediss?:$/.test(u.protocol) && u.hostname.endsWith(".upstash.io") && u.password) {
+        return { url: `https://${u.hostname}`, token: decodeURIComponent(u.password) };
+      }
+    } catch {
+      /* not a URL */
+    }
+  }
+  return null;
 }
 
 function db(): Redis {
-  const configured =
-    (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) ||
-    (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
-  if (!configured) throw new DbNotConfiguredError();
-  // fromEnv reads either the Vercel (KV_REST_API_*) or Upstash (UPSTASH_REDIS_REST_*) variables.
-  return (redis ??= Redis.fromEnv());
+  if (redis) return redis;
+  const config = resolveDbConfig(process.env);
+  if (!config) {
+    // Names only (never values), to help spot a misnamed or missing variable.
+    const related = Object.keys(process.env).filter((k) => /REDIS|UPSTASH|KV_/.test(k));
+    throw new DbNotConfiguredError(
+      "No database connected. " +
+        (related.length
+          ? `Found ${related.join(", ")}, but no usable Upstash REST URL + token pair.`
+          : "No database variables are visible to this deployment — check they're enabled for Production, then redeploy."),
+    );
+  }
+  return (redis = new Redis(config));
 }
 
 export async function listMeals(): Promise<Meal[]> {
