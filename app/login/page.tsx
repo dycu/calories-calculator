@@ -21,15 +21,15 @@ export default function Login() {
       return;
     }
     const data = await res?.json().catch(() => ({}));
-    setError(data?.error ?? "Couldn't reach the server.");
+    setError(data?.error ?? "Brak połączenia z serwerem.");
     setBusy(false);
   }
 
   return (
     <main className="wrap login">
-      <h1>Meal Calories</h1>
+      <h1>Kalorie posiłków</h1>
       <form className="card" onSubmit={submit}>
-        <label htmlFor="password">Password</label>
+        <label htmlFor="password">Hasło</label>
         <input
           id="password"
           type="password"
@@ -39,7 +39,7 @@ export default function Login() {
           onChange={(e) => setPassword(e.target.value)}
         />
         <button className="primary" type="submit" disabled={busy || !password}>
-          {busy ? "Logging in…" : "Log in"}
+          {busy ? "Logowanie…" : "Zaloguj"}
         </button>
         {error && <p className="error">{error}</p>}
       </form>

@@ -5,10 +5,10 @@ async function call<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, headers: { "content-type": "application/json", ...init?.headers } });
   if (res.status === 401) {
     window.location.href = "/login";
-    throw new Error("Not logged in.");
+    throw new Error("Nie zalogowano.");
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? `Server error (${res.status}).`);
+  if (!res.ok) throw new Error(data.error ?? `Błąd serwera (${res.status}).`);
   return data as T;
 }
 

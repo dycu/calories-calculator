@@ -15,7 +15,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const meals: unknown[] = Array.isArray(body?.meals) ? body.meals : [];
-  if (!meals.every(isMeal)) return Response.json({ error: "Invalid meals." }, { status: 400 });
+  if (!meals.every(isMeal)) return Response.json({ error: "Nieprawidłowe dane posiłków." }, { status: 400 });
   try {
     await saveMeals(meals);
     return Response.json({ ok: true, count: meals.length });

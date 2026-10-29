@@ -6,7 +6,7 @@ export async function middleware(req: NextRequest) {
   if (token && req.cookies.get(SESSION_COOKIE)?.value === token) return NextResponse.next();
 
   if (req.nextUrl.pathname.startsWith("/api/")) {
-    return NextResponse.json({ error: "Not logged in." }, { status: 401 });
+    return NextResponse.json({ error: "Nie zalogowano." }, { status: 401 });
   }
   return NextResponse.redirect(new URL("/login", req.url));
 }

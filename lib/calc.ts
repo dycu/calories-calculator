@@ -48,8 +48,9 @@ export function per100gOfMeal(t: MealTotals, key: NutrientKey): number | null {
 
 export const round = (n: number, step = 1) => Math.round(n / step) * step;
 
-/** kcal as whole numbers, salt to 0.01 g, other grams to 0.1 g. */
+/** kcal as whole numbers, salt to 0.01 g, other grams to 0.1 g; Polish decimal comma. */
 export function fmt(key: NutrientKey, v: number): string {
   if (key === "kcal") return String(Math.round(v));
-  return (key === "salt" ? round(v, 0.01).toFixed(2) : round(v, 0.1).toFixed(1)).replace(/\.0+$/, "");
+  const s = key === "salt" ? round(v, 0.01).toFixed(2) : round(v, 0.1).toFixed(1);
+  return s.replace(/\.0+$/, "").replace(".", ",");
 }

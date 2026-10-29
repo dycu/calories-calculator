@@ -1,31 +1,29 @@
-# Meal Calories
+# Kalorie posiłków
 
-A small web app for logging home-cooked meals and their full nutrition: energy, fat, saturated fat, carbohydrates, sugars, fibre, protein and salt.
+Aplikacja do zapisywania domowych posiłków i ich pełnych wartości odżywczych: wartość energetyczna, tłuszcz, kwasy nasycone, węglowodany, cukry, błonnik, białko i sól.
 
-1. **Ingredients** – write down each ingredient and its weight in grams. Tap 📷 on ingredients you'll show a package photo for. Any value you already know can be typed in under "Nutrients per 100 g"; the AI never overwrites values you typed.
-2. **Whole meal weight** – weigh the finished meal (cooking changes the weight).
-3. **Nutrition** – tap **Copy prompt**, paste it into an AI chat with web search (Claude, ChatGPT, …), attach the package photos there, then paste the AI's reply back and tap **Apply reply**. Photos are read from the label; everything else is looked up on the web (manufacturer pages or food databases). The AI only supplies values per 100 g for each ingredient; the app does the arithmetic and shows totals for the whole meal and per 100 g.
+1. **Składniki** – wpisz każdy składnik i jego wagę w gramach. Stuknij 📷 przy składnikach, których zdjęcie etykiety dołączysz w czacie z AI. Znane wartości możesz wpisać ręcznie w „Wartości na 100 g” – AI nigdy ich nie nadpisuje.
+2. **Waga całego posiłku** – zważ gotowy posiłek (gotowanie zmienia wagę).
+3. **Wartości odżywcze** – stuknij **Kopiuj prompt**, wklej go do czatu z AI z wyszukiwaniem w sieci (Claude, ChatGPT…), dołącz zdjęcia opakowań, a potem wklej odpowiedź i stuknij **Zastosuj odpowiedź**. Etykiety AI odczytuje ze zdjęć, resztę wyszukuje w internecie (strony producentów i sklepów, tabele składu żywności NIZP PZH / IŻŻ). AI podaje tylko wartości na 100 g; sumy dla całego posiłku i na 100 g liczy aplikacja.
 
-**Creating a meal from photos:** in a new (empty) meal, or with **📷 Add from photos** on an existing one, copy the prompt into your AI chat and attach photos of the ingredients – packages, the scale display, or everything on the counter. Paste the reply back and the AI's ingredient list is added with weights and nutrition. Weights the AI couldn't read from a scale are marked "≈ weight guessed" until you type the real weight.
+**Posiłek ze zdjęć:** w nowym posiłku (albo przyciskiem **📷 Dodaj ze zdjęć**) skopiuj prompt do czatu z AI i dołącz zdjęcia składników – opakowań, wyświetlacza wagi albo wszystkiego na blacie. Po wklejeniu odpowiedzi składniki dodają się z wagami i wartościami odżywczymi. Wagi, których AI nie odczytało z wagi kuchennej, są oznaczone „≈ waga szacowana”, dopóki nie wpiszesz prawdziwej.
 
-**Making a meal again:** tap **+ New meal** and pick one you've made before (searchable), type the name of a previous meal and tap **Reuse it**, or tap **Make again** on an open meal. Its recipe notes, ingredients, weights and nutrition values are copied – adjust the weights if they changed and weigh the finished meal; no need to ask the AI again.
+**Ponowne robienie posiłku:** stuknij **+ Nowy posiłek** i wybierz wcześniejszy posiłek, wpisz nazwę wcześniejszego posiłku i stuknij **Użyj ponownie** albo stuknij **Zrób ponownie** w otwartym posiłku. Kopiują się notatki, składniki, wagi i wartości odżywcze – popraw wagi i zważ gotowy posiłek.
 
-Extras: ingredients you've used before autofill their nutrition values; optional recipe notes per meal are saved and included in the AI prompt.
+Aplikacja jest chroniona hasłem, a posiłki są zapisywane na serwerze w bazie Upstash Redis, więc są takie same na każdym urządzeniu.
 
-The app is behind a simple password login, and meals are stored on the server in an Upstash Redis database, so they're the same on every device. Meals saved in a browser by the earlier browser-only version are uploaded automatically the first time you log in there.
+## Uruchomienie lokalne
 
-## Run locally
-
-Copy `.env.example` to `.env.local` and fill it in (database values come from the Vercel Storage tab), then:
+Skopiuj `.env.example` do `.env.local` i uzupełnij, a potem:
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Deploy to Vercel
+## Wdrożenie na Vercel
 
-1. Import the repo at vercel.com/new (standard Next.js app).
-2. In the project's **Storage** tab, create an **Upstash → Redis** database (free plan) and connect it to the project. This adds `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
-3. In **Settings → Environment Variables**, add `APP_PASSWORD`.
-4. Redeploy so the new variables take effect.
+1. Zaimportuj repozytorium na vercel.com/new (zwykła aplikacja Next.js).
+2. Podłącz bazę Upstash Redis: w zakładce **Storage** projektu albo zakładając bazę na console.upstash.com i dodając `UPSTASH_REDIS_REST_URL` oraz `UPSTASH_REDIS_REST_TOKEN`. Baza może być współdzielona z innym projektem – dane tej aplikacji są pod kluczem `calories-calculator:meals`.
+3. W **Settings → Environment Variables** dodaj `APP_PASSWORD`.
+4. Zrób **Redeploy**, żeby nowe zmienne zaczęły działać.

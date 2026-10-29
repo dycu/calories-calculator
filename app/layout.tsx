@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Meal Calories",
-  description: "Log meal ingredients, let AI work out the calories, and size your portion.",
+  title: "Kalorie posiłków",
+  description: "Zapisuj składniki posiłków i licz ich wartości odżywcze z pomocą AI.",
 };
 
 export const viewport: Viewport = {
@@ -17,7 +17,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="pl">
       <body>{children}</body>
     </html>
   );

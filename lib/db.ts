@@ -43,10 +43,10 @@ function db(): Redis {
     // Names only (never values), to help spot a misnamed or missing variable.
     const related = Object.keys(process.env).filter((k) => /REDIS|UPSTASH|KV_/.test(k));
     throw new DbNotConfiguredError(
-      "No database connected. " +
+      "Brak połączenia z bazą danych. " +
         (related.length
-          ? `Found ${related.join(", ")}, but no usable Upstash REST URL + token pair.`
-          : "No database variables are visible to this deployment — check they're enabled for Production, then redeploy."),
+          ? `Widzę ${related.join(", ")}, ale brak pary URL + token Upstash REST.`
+          : "Ta wersja nie widzi żadnych zmiennych bazy — sprawdź, czy są włączone dla Production, i zrób Redeploy."),
     );
   }
   return (redis = new Redis(config));

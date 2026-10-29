@@ -1,13 +1,13 @@
 /** The values on an EU nutrition label, all per 100 g. */
 export const NUTRIENTS = [
-  { key: "kcal", label: "Energy", unit: "kcal" },
-  { key: "fat", label: "Fat", unit: "g" },
-  { key: "satFat", label: "of which saturates", unit: "g", sub: true },
-  { key: "carbs", label: "Carbohydrates", unit: "g" },
-  { key: "sugars", label: "of which sugars", unit: "g", sub: true },
-  { key: "fiber", label: "Fibre", unit: "g" },
-  { key: "protein", label: "Protein", unit: "g" },
-  { key: "salt", label: "Salt", unit: "g" },
+  { key: "kcal", label: "Wartość energetyczna", unit: "kcal" },
+  { key: "fat", label: "Tłuszcz", unit: "g" },
+  { key: "satFat", label: "w tym kwasy nasycone", unit: "g", sub: true },
+  { key: "carbs", label: "Węglowodany", unit: "g" },
+  { key: "sugars", label: "w tym cukry", unit: "g", sub: true },
+  { key: "fiber", label: "Błonnik", unit: "g" },
+  { key: "protein", label: "Białko", unit: "g" },
+  { key: "salt", label: "Sól", unit: "g" },
 ] as const;
 
 export type NutrientKey = (typeof NUTRIENTS)[number]["key"];

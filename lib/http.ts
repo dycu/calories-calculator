@@ -6,5 +6,5 @@ export function errorResponse(error: unknown): Response {
     return Response.json({ error: error.message }, { status: 503 });
   }
   console.error(error);
-  return Response.json({ error: "Server error while talking to the database." }, { status: 500 });
+  return Response.json({ error: "Błąd serwera podczas komunikacji z bazą danych." }, { status: 500 });
 }

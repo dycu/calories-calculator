@@ -6,7 +6,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function PUT(req: Request, { params }: Ctx) {
   const { id } = await params;
   const meal = await req.json().catch(() => null);
-  if (!isMeal(meal) || meal.id !== id) return Response.json({ error: "Invalid meal." }, { status: 400 });
+  if (!isMeal(meal) || meal.id !== id) return Response.json({ error: "Nieprawidłowe dane posiłku." }, { status: 400 });
   try {
     await saveMeals([meal]);
     return Response.json({ ok: true });
