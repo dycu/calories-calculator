@@ -1,0 +1,25 @@
+import type { Meal } from "./types";
+
+async function call<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...init, headers: { "content-type": "application/json", ...init?.headers } });
+  if (res.status === 401) {
+    window.location.href = "/login";
+    throw new Error("Not logged in.");
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? `Server error (${res.status}).`);
+  return data as T;
+}
+
+export const fetchMeals = () => call<{ meals: Meal[] }>("/api/meals").then((d) => d.meals);
+
+export const uploadMeals = (meals: Meal[]) =>
+  call("/api/meals", { method: "POST", body: JSON.stringify({ meals }) });
+
+// keepalive lets a save started as the page closes still reach the server.
+export const putMeal = (meal: Meal) =>
+  call(`/api/meals/${meal.id}`, { method: "PUT", body: JSON.stringify(meal), keepalive: true });
+
+export const deleteMeal = (id: string) => call(`/api/meals/${id}`, { method: "DELETE" });
+
+export const logout = () => call("/api/logout", { method: "POST" });

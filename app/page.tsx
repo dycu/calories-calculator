@@ -1,9 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { gramsForKcal, ingredientKcal, mealTotals, round } from "@/lib/calc";
 import { buildPrompt, parseReply } from "@/lib/prompt";
-import { findPrevious, loadMeals, mealFromPrevious, newId, newMeal, previousMeals, saveMeals } from "@/lib/storage";
+import { deleteMeal, fetchMeals, logout, putMeal, uploadMeals } from "@/lib/api";
+import {
+  findPrevious,
+  loadLegacyMeals,
+  markLegacyUploaded,
+  mealFromPrevious,
+  newId,
+  newMeal,
+  previousMeals,
+} from "@/lib/storage";
 import type { Ingredient, KcalSource, Meal } from "@/lib/types";
 
 const num = (v: string): number | null => {
@@ -11,26 +20,116 @@ const num = (v: string): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+type SaveState = "saved" | "saving" | "error";
+
+const SAVE_DELAY_MS = 800;
+
 export default function Home() {
   const [meals, setMeals] = useState<Meal[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [saveState, setSaveState] = useState<SaveState>("saved");
+  const [saveError, setSaveError] = useState("");
 
-  useEffect(() => {
-    loadMeals().then(setMeals);
+  // Edits are saved per meal, a moment after typing stops.
+  const pending = useRef(new Map<string, { meal: Meal; timer: ReturnType<typeof setTimeout> }>());
+
+  const save = useCallback((meal: Meal) => {
+    setSaveState("saving");
+    putMeal(meal)
+      .then(() => {
+        if (pending.current.size === 0) setSaveState("saved");
+      })
+      .catch((e: Error) => {
+        setSaveState("error");
+        setSaveError(e.message);
+      });
   }, []);
 
-  function update(next: Meal[]) {
-    setMeals(next);
-    saveMeals(next);
-  }
+  const flush = useCallback(() => {
+    for (const { meal, timer } of pending.current.values()) {
+      clearTimeout(timer);
+      pending.current.delete(meal.id);
+      save(meal);
+    }
+  }, [save]);
 
+  useEffect(() => {
+    const onHide = () => document.visibilityState === "hidden" && flush();
+    document.addEventListener("visibilitychange", onHide);
+    return () => document.removeEventListener("visibilitychange", onHide);
+  }, [flush]);
+
+  const load = useCallback(async () => {
+    setLoadError("");
+    try {
+      let server = await fetchMeals();
+      // One-time move of meals saved in this browser before server storage existed.
+      const legacy = await loadLegacyMeals();
+      if (legacy.length) {
+        const known = new Set(server.map((m) => m.id));
+        const missing = legacy.filter((m) => !known.has(m.id));
+        if (missing.length) {
+          await uploadMeals(missing);
+          server = await fetchMeals();
+          setNotice(`Moved ${missing.length} meal${missing.length > 1 ? "s" : ""} from this device to your account.`);
+        }
+        await markLegacyUploaded();
+      }
+      setMeals(server);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (loadError) {
+    return (
+      <main className="wrap">
+        <p className="error">{loadError}</p>
+        <button onClick={load}>Try again</button>
+      </main>
+    );
+  }
   if (!meals) return <main className="wrap"><p className="muted">Loading…</p></main>;
 
+  function change(meal: Meal) {
+    setMeals((ms) => ms!.map((x) => (x.id === meal.id ? meal : x)));
+    const prev = pending.current.get(meal.id);
+    if (prev) clearTimeout(prev.timer);
+    setSaveState("saving");
+    const timer = setTimeout(() => {
+      pending.current.delete(meal.id);
+      save(meal);
+    }, SAVE_DELAY_MS);
+    pending.current.set(meal.id, { meal, timer });
+  }
+
   function create(meal: Meal) {
-    update([meal, ...meals!]);
+    flush();
+    setMeals([meal, ...meals!]);
+    save(meal);
     setPicking(false);
     setOpenId(meal.id);
+  }
+
+  async function remove(meal: Meal) {
+    if (!confirm(`Delete “${meal.name || "Untitled meal"}”?`)) return;
+    const p = pending.current.get(meal.id);
+    if (p) clearTimeout(p.timer);
+    pending.current.delete(meal.id);
+    try {
+      await deleteMeal(meal.id);
+      setMeals((ms) => ms!.filter((x) => x.id !== meal.id));
+      setOpenId(null);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    }
   }
 
   const open = meals.find((m) => m.id === openId);
@@ -39,13 +138,14 @@ export default function Home() {
       <MealEditor
         meal={open}
         allMeals={meals}
-        onChange={(m) => update(meals.map((x) => (x.id === m.id ? m : x)))}
-        onBack={() => setOpenId(null)}
-        onDelete={() => {
-          if (!confirm(`Delete “${open.name || "Untitled meal"}”?`)) return;
-          update(meals.filter((x) => x.id !== open.id));
+        saveState={saveState}
+        saveError={saveError}
+        onChange={change}
+        onBack={() => {
+          flush();
           setOpenId(null);
         }}
+        onDelete={() => remove(open)}
         onMakeAgain={() => create(mealFromPrevious(open))}
       />
     );
@@ -59,13 +159,26 @@ export default function Home() {
     <main className="wrap">
       <header className="top">
         <h1>Meals</h1>
-        <button
-          className="primary"
-          onClick={() => (previousMeals(meals).length ? setPicking(true) : create(newMeal()))}
-        >
-          + New meal
-        </button>
+        <div className="row">
+          <button
+            className="ghost small"
+            onClick={async () => {
+              flush();
+              await logout();
+              window.location.href = "/login";
+            }}
+          >
+            Log out
+          </button>
+          <button
+            className="primary"
+            onClick={() => (previousMeals(meals).length ? setPicking(true) : create(newMeal()))}
+          >
+            + New meal
+          </button>
+        </div>
       </header>
+      {notice && <p className="banner small">{notice}</p>}
       {meals.length === 0 && (
         <p className="muted empty">
           No meals yet. Add one, list its ingredients with weights, and let the AI work out the calories.
@@ -162,6 +275,8 @@ function MealPicker({
 function MealEditor({
   meal,
   allMeals,
+  saveState,
+  saveError,
   onChange,
   onBack,
   onDelete,
@@ -169,6 +284,8 @@ function MealEditor({
 }: {
   meal: Meal;
   allMeals: Meal[];
+  saveState: SaveState;
+  saveError: string;
   onChange: (m: Meal) => void;
   onBack: () => void;
   onDelete: () => void;
@@ -264,6 +381,9 @@ function MealEditor({
     <main className="wrap">
       <header className="top">
         <button className="ghost" onClick={onBack}>← Meals</button>
+        <span className={`save-status${saveState === "error" ? " error" : ""}`} title={saveError}>
+          {saveState === "saving" ? "Saving…" : saveState === "error" ? "Not saved!" : "Saved"}
+        </span>
         <div className="row">
           <button className="ghost" onClick={onMakeAgain}>Make again</button>
           <button className="ghost danger" onClick={onDelete}>Delete</button>

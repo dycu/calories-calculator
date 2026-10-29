@@ -165,3 +165,11 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; marg
 .blank { width: 100%; margin: 12px 0 20px; }
 .picker-heading { margin-top: 4px; }
 .search { width: 100%; margin: 4px 0 10px; }
+
+.login { max-width: 400px; padding-top: 15vh; }
+.login h1 { margin-bottom: 16px; }
+.login form { display: grid; gap: 10px; }
+.login label { font-weight: 600; }
+.save-status { font-size: 0.8rem; color: var(--muted); }
+.save-status.error { color: var(--danger); }
+.banner { background: var(--warn-soft); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }

@@ -11,9 +11,11 @@ A small web app for logging home-cooked meals and sizing portions by calories.
 
 Extras: every kcal/100 g value can be edited by hand; ingredients you've used before autofill their kcal/100 g; optional recipe notes per meal are saved and included in the AI prompt.
 
-Data is stored in your browser (IndexedDB) – no account, no server, no API key. It's per-device: meals saved on your phone won't appear on your laptop.
+The app is behind a simple password login, and meals are stored on the server in an Upstash Redis database, so they're the same on every device. Meals saved in a browser by the earlier browser-only version are uploaded automatically the first time you log in there.
 
 ## Run locally
+
+Copy `.env.example` to `.env.local` and fill it in (database values come from the Vercel Storage tab), then:
 
 ```bash
 npm install
@@ -22,8 +24,7 @@ npm run dev
 
 ## Deploy to Vercel
 
-Push this folder to a GitHub repo and import it at vercel.com/new – it's a standard Next.js app, no environment variables needed. Or with the CLI:
-
-```bash
-npx vercel
-```
+1. Import the repo at vercel.com/new (standard Next.js app).
+2. In the project's **Storage** tab, create an **Upstash → Redis** database (free plan) and connect it to the project. This adds `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
+3. In **Settings → Environment Variables**, add `APP_PASSWORD`.
+4. Redeploy so the new variables take effect.

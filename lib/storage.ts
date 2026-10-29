@@ -1,15 +1,22 @@
 import { get, set } from "idb-keyval";
 import type { Meal } from "./types";
 
-// IndexedDB: survives reloads, no size worries as the meal history grows.
-const KEY = "meals-v1";
+// Before meals were stored on the server they lived in the browser's IndexedDB.
+// They are uploaded once after logging in, then the local copy is marked done.
+const LEGACY_KEY = "meals-v1";
+const MIGRATED_KEY = "meals-v1-uploaded";
 
-export async function loadMeals(): Promise<Meal[]> {
-  return (await get<Meal[]>(KEY)) ?? [];
+export async function loadLegacyMeals(): Promise<Meal[]> {
+  try {
+    if (await get(MIGRATED_KEY)) return [];
+    return (await get<Meal[]>(LEGACY_KEY)) ?? [];
+  } catch {
+    return []; // IndexedDB unavailable (e.g. private mode): nothing to migrate
+  }
 }
 
-export async function saveMeals(meals: Meal[]): Promise<void> {
-  await set(KEY, meals);
+export async function markLegacyUploaded(): Promise<void> {
+  await set(MIGRATED_KEY, true);
 }
 
 export const newId = () => crypto.randomUUID();
