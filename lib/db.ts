@@ -1,7 +1,8 @@
 import { Redis } from "@upstash/redis";
 import type { Meal } from "./types";
 
-const MEALS_KEY = "meals"; // Redis hash: meal id -> meal JSON
+// Namespaced so the database can be shared with other projects without clashes.
+const MEALS_KEY = "calories-calculator:meals"; // Redis hash: meal id -> meal JSON
 
 let redis: Redis | null = null;
 
