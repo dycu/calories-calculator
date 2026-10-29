@@ -4,7 +4,7 @@ import type { AiResult, Ingredient } from "./types";
  * Build a prompt to paste into any AI chat. Ingredients are numbered so the
  * reply can be matched back even if the AI tweaks the names.
  */
-export function buildPrompt(mealName: string, ingredients: Ingredient[]): string {
+export function buildPrompt(mealName: string, description: string, ingredients: Ingredient[]): string {
   const photoRows = ingredients.map((ing, idx) => ({ ing, n: idx + 1 })).filter(({ ing }) => ing.hasPhoto);
   const lines = ingredients.map(
     (ing, idx) =>
@@ -13,7 +13,7 @@ export function buildPrompt(mealName: string, ingredients: Ingredient[]): string
 
   return `I'm tracking calories of a home-cooked meal${mealName.trim() ? ` ("${mealName.trim()}")` : ""}. For each ingredient below, give its energy density in kcal per 100 g, as weighed.
 
-Ingredients:
+${description.trim() ? `Recipe notes: ${description.trim()}\n\n` : ""}Ingredients:
 ${lines.join("\n")}
 ${
   photoRows.length

@@ -15,6 +15,8 @@ export interface Ingredient {
 export interface Meal {
   id: string;
   name: string;
+  /** Free-text recipe notes (how it's cooked, brands…); reused when making the meal again. */
+  description?: string;
   createdAt: string;
   ingredients: Ingredient[];
   /** Weight of the whole finished meal in grams (e.g. after cooking). */

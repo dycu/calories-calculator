@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { gramsForKcal, ingredientKcal, mealTotals, round } from "@/lib/calc";
 import { buildPrompt, parseReply } from "@/lib/prompt";
-import { loadMeals, newId, newMeal, saveMeals } from "@/lib/storage";
+import { findPrevious, loadMeals, mealFromPrevious, newId, newMeal, previousMeals, saveMeals } from "@/lib/storage";
 import type { Ingredient, KcalSource, Meal } from "@/lib/types";
 
 const num = (v: string): number | null => {
@@ -14,6 +14,7 @@ const num = (v: string): number | null => {
 export default function Home() {
   const [meals, setMeals] = useState<Meal[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
 
   useEffect(() => {
     loadMeals().then(setMeals);
@@ -25,6 +26,12 @@ export default function Home() {
   }
 
   if (!meals) return <main className="wrap"><p className="muted">Loading…</p></main>;
+
+  function create(meal: Meal) {
+    update([meal, ...meals!]);
+    setPicking(false);
+    setOpenId(meal.id);
+  }
 
   const open = meals.find((m) => m.id === openId);
   if (open) {
@@ -39,21 +46,13 @@ export default function Home() {
           update(meals.filter((x) => x.id !== open.id));
           setOpenId(null);
         }}
-        onDuplicate={() => {
-          const copy: Meal = {
-            ...structuredClone(open),
-            id: newId(),
-            name: `${open.name || "Untitled meal"} (copy)`,
-            createdAt: new Date().toISOString(),
-            totalWeight: null,
-            promptIds: [],
-            ingredients: open.ingredients.map((i) => ({ ...i, id: newId() })),
-          };
-          update([copy, ...meals]);
-          setOpenId(copy.id);
-        }}
+        onMakeAgain={() => create(mealFromPrevious(open))}
       />
     );
+  }
+
+  if (picking) {
+    return <MealPicker meals={previousMeals(meals)} onPick={create} onCancel={() => setPicking(false)} />;
   }
 
   return (
@@ -62,11 +61,7 @@ export default function Home() {
         <h1>Meals</h1>
         <button
           className="primary"
-          onClick={() => {
-            const m = newMeal();
-            update([m, ...meals]);
-            setOpenId(m.id);
-          }}
+          onClick={() => (previousMeals(meals).length ? setPicking(true) : create(newMeal()))}
         >
           + New meal
         </button>
@@ -105,26 +100,86 @@ export default function Home() {
   );
 }
 
+function MealPicker({
+  meals,
+  onPick,
+  onCancel,
+}: {
+  meals: Meal[];
+  onPick: (m: Meal) => void;
+  onCancel: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const shown = q
+    ? meals.filter((m) => m.name.toLowerCase().includes(q) || (m.description ?? "").toLowerCase().includes(q))
+    : meals;
+
+  return (
+    <main className="wrap">
+      <header className="top">
+        <button className="ghost" onClick={onCancel}>← Meals</button>
+      </header>
+      <h1>New meal</h1>
+      <button className="primary blank" onClick={() => onPick(newMeal())}>
+        Start from scratch
+      </button>
+      <h2 className="picker-heading">…or make one again</h2>
+      <p className="muted small">Copies the ingredients and their kcal/100 g. Adjust the weights, then weigh the finished meal.</p>
+      <input
+        className="search"
+        type="search"
+        placeholder="Search your meals"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      <ul className="meal-list">
+        {shown.map((m) => {
+          const t = mealTotals(m);
+          return (
+            <li key={m.id}>
+              <button className="meal-card" onClick={() => onPick(mealFromPrevious(m))}>
+                <span className="meal-name">{m.name}</span>
+                <span className="muted small">
+                  {m.description?.trim() ||
+                    m.ingredients.map((i) => i.name).filter(Boolean).join(", ")}
+                </span>
+                <span className="meal-kcal small muted">
+                  {t.kcalPer100g ? `${round(t.kcalPer100g)} kcal/100 g` : ""}
+                  <br />
+                  last {new Date(m.createdAt).toLocaleDateString()}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+        {shown.length === 0 && <p className="muted small">No matching meals.</p>}
+      </ul>
+    </main>
+  );
+}
+
 function MealEditor({
   meal,
   allMeals,
   onChange,
   onBack,
   onDelete,
-  onDuplicate,
+  onMakeAgain,
 }: {
   meal: Meal;
   allMeals: Meal[];
   onChange: (m: Meal) => void;
   onBack: () => void;
   onDelete: () => void;
-  onDuplicate: () => void;
+  onMakeAgain: () => void;
 }) {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [reply, setReply] = useState("");
   const [recheckAll, setRecheckAll] = useState(false);
   const totals = mealTotals(meal);
+  const previous = findPrevious(allMeals, meal);
 
   // Ingredients with a known kcal/100g from earlier meals, for autocomplete.
   const library = useMemo(() => {
@@ -163,7 +218,7 @@ function MealEditor({
   const toAsk = meal.ingredients.filter(
     (i) => i.name.trim() && (recheckAll || i.kcalPer100g == null || (i.hasPhoto && i.kcalSource !== "label")),
   );
-  const prompt = toAsk.length ? buildPrompt(meal.name, toAsk) : "";
+  const prompt = toAsk.length ? buildPrompt(meal.name, meal.description ?? "", toAsk) : "";
 
   async function copyPrompt() {
     setError("");
@@ -210,7 +265,7 @@ function MealEditor({
       <header className="top">
         <button className="ghost" onClick={onBack}>← Meals</button>
         <div className="row">
-          <button className="ghost" onClick={onDuplicate}>Duplicate</button>
+          <button className="ghost" onClick={onMakeAgain}>Make again</button>
           <button className="ghost danger" onClick={onDelete}>Delete</button>
         </div>
       </header>
@@ -218,8 +273,38 @@ function MealEditor({
       <input
         className="title-input"
         placeholder="Meal name (e.g. Chicken curry)"
+        list="previous-meals"
         value={meal.name}
         onChange={(e) => set({ name: e.target.value })}
+      />
+      <datalist id="previous-meals">
+        {previousMeals(allMeals, meal.id).map((m) => (
+          <option key={m.id} value={m.name} />
+        ))}
+      </datalist>
+      {previous && meal.ingredients.length === 0 && (
+        <div className="reuse">
+          <span className="small">
+            You made “{previous.name}” on {new Date(previous.createdAt).toLocaleDateString()} with{" "}
+            {previous.ingredients.length} ingredients.
+          </span>
+          <button
+            className="primary"
+            onClick={() => {
+              const { name, description, ingredients, targetKcal } = mealFromPrevious(previous);
+              onChange({ ...meal, name, description, ingredients, targetKcal });
+            }}
+          >
+            Reuse it
+          </button>
+        </div>
+      )}
+      <textarea
+        className="description"
+        placeholder="Recipe notes (optional): how it’s made, brands, oil used… Saved for next time and sent to the AI."
+        rows={2}
+        value={meal.description ?? ""}
+        onChange={(e) => set({ description: e.target.value })}
       />
 
       <section className="card">

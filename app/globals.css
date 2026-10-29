@@ -155,3 +155,13 @@ button.photo.on { opacity: 1; background: var(--accent-soft); border-color: var(
 input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+.description { margin-bottom: 12px; background: var(--surface); }
+.reuse {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;
+}
+.reuse button { flex: none; }
+.blank { width: 100%; margin: 12px 0 20px; }
+.picker-heading { margin-top: 4px; }
+.search { width: 100%; margin: 4px 0 10px; }
