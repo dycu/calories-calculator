@@ -160,7 +160,7 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; marg
   background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;
 }
 .reuse button { flex: none; }
-.blank { width: 100%; margin: 12px 0 20px; }
+.start-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0 20px; }
 .picker-heading { margin-top: 4px; }
 .search { width: 100%; margin: 4px 0 10px; }
 
@@ -187,3 +187,8 @@ table.nutrition th, table.nutrition td { padding: 6px 4px; border-bottom: 1px so
 table.nutrition th[scope="row"] { text-align: left; font-weight: 600; }
 table.nutrition thead th { font-size: 0.78rem; color: var(--muted); font-weight: 600; }
 @media (max-width: 420px) { .nutrient-grid { grid-template-columns: 1fr; } }
+
+.photo-recipe { background: var(--accent-soft); border-radius: 10px; padding: 12px; margin: 8px 0 12px; }
+.photo-recipe-head { justify-content: space-between; }
+.photo-recipe .reply, .photo-recipe .prompt-preview textarea { background: var(--surface); }
+.photo-recipe .or { margin: 12px 0 0 !important; }

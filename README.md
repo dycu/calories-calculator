@@ -6,6 +6,8 @@ A small web app for logging home-cooked meals and their full nutrition: energy, 
 2. **Whole meal weight** – weigh the finished meal (cooking changes the weight).
 3. **Nutrition** – tap **Copy prompt**, paste it into an AI chat with web search (Claude, ChatGPT, …), attach the package photos there, then paste the AI's reply back and tap **Apply reply**. Photos are read from the label; everything else is looked up on the web (manufacturer pages or food databases). The AI only supplies values per 100 g for each ingredient; the app does the arithmetic and shows totals for the whole meal and per 100 g.
 
+**Creating a meal from photos:** in a new (empty) meal, or with **📷 Add from photos** on an existing one, copy the prompt into your AI chat and attach photos of the ingredients – packages, the scale display, or everything on the counter. Paste the reply back and the AI's ingredient list is added with weights and nutrition. Weights the AI couldn't read from a scale are marked "≈ weight guessed" until you type the real weight.
+
 **Making a meal again:** tap **+ New meal** and pick one you've made before (searchable), type the name of a previous meal and tap **Reuse it**, or tap **Make again** on an open meal. Its recipe notes, ingredients, weights and nutrition values are copied – adjust the weights if they changed and weigh the finished meal; no need to ask the AI again.
 
 Extras: ingredients you've used before autofill their nutrition values; optional recipe notes per meal are saved and included in the AI prompt.

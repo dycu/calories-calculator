@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { emptyNutrients, fmt, ingredientAmount, mealTotals, missingNutrients, per100gOfMeal, round } from "@/lib/calc";
-import { buildPrompt, parseReply } from "@/lib/prompt";
+import { buildPrompt, buildRecipePrompt, parseRecipeReply, parseReply, type RecipeResult } from "@/lib/prompt";
 import { deleteMeal, fetchMeals, logout, putMeal, uploadMeals } from "@/lib/api";
 import {
   findPrevious,
@@ -238,9 +238,14 @@ function MealPicker({
         <button className="ghost" onClick={onCancel}>← Meals</button>
       </header>
       <h1>New meal</h1>
-      <button className="primary blank" onClick={() => onPick(newMeal())}>
-        Start from scratch
-      </button>
+      <div className="start-buttons">
+        <button className="primary" onClick={() => onPick(newMeal())}>
+          Start from scratch
+        </button>
+        <button className="primary" onClick={() => onPick(newMeal())}>
+          📷 Create from photos
+        </button>
+      </div>
       <h2 className="picker-heading">…or make one again</h2>
       <p className="muted small">Copies the ingredients and their kcal/100 g. Adjust the weights, then weigh the finished meal.</p>
       <input
@@ -299,6 +304,7 @@ function MealEditor({
   const [copied, setCopied] = useState(false);
   const [reply, setReply] = useState("");
   const [recheckAll, setRecheckAll] = useState(false);
+  const [photosOpen, setPhotosOpen] = useState(false);
   const totals = mealTotals(meal);
   const previous = findPrevious(allMeals, meal);
 
@@ -333,6 +339,30 @@ function MealEditor({
         },
       ],
     });
+  }
+
+  /** Add the ingredients the AI found in the photos; fill name/notes only if still empty. */
+  function applyRecipe(r: RecipeResult) {
+    const added: Ingredient[] = r.ingredients.map((i) => ({
+      id: newId(),
+      name: i.name,
+      grams: i.grams,
+      gramsEstimated: i.grams != null && i.gramsEstimated,
+      per100g: { ...emptyNutrients(), ...i.values },
+      source: i.source,
+      manual: [],
+      note: i.note,
+      hasPhoto: false,
+    }));
+    onChange({
+      ...meal,
+      name: meal.name.trim() ? meal.name : r.name,
+      description: meal.description?.trim() ? meal.description : r.description,
+      ingredients: [...meal.ingredients, ...added],
+      aiNotes: r.notes,
+      calculatedAt: new Date().toISOString(),
+    });
+    setPhotosOpen(false);
   }
 
   function fillFromLibrary(ing: Ingredient) {
@@ -462,6 +492,9 @@ function MealEditor({
             <option key={i.id} value={i.name} />
           ))}
         </datalist>
+        {(meal.ingredients.length === 0 || photosOpen) && (
+          <PhotoRecipe meal={meal} onApply={applyRecipe} onClose={meal.ingredients.length ? () => setPhotosOpen(false) : undefined} />
+        )}
         <div className="ingredients">
           {meal.ingredients.map((ing) => (
             <IngredientRow
@@ -473,7 +506,12 @@ function MealEditor({
             />
           ))}
         </div>
-        <button onClick={addIngredient}>+ Add ingredient</button>
+        <div className="row wrap-row">
+          <button onClick={addIngredient}>+ Add ingredient</button>
+          {meal.ingredients.length > 0 && !photosOpen && (
+            <button onClick={() => setPhotosOpen(true)}>📷 Add from photos</button>
+          )}
+        </div>
       </section>
 
       <section className="card">
@@ -654,7 +692,7 @@ function IngredientRow({
             min={0}
             placeholder="0"
             value={ing.grams ?? ""}
-            onChange={(e) => onChange({ grams: num(e.target.value) })}
+            onChange={(e) => onChange({ grams: num(e.target.value), gramsEstimated: false })}
           />
           <span>g</span>
         </label>
@@ -674,6 +712,11 @@ function IngredientRow({
           <span>kcal/100g</span>
         </label>
         {ing.source && <span className={`badge ${ing.source}`}>{SOURCE_LABEL[ing.source]}</span>}
+        {ing.gramsEstimated && (
+          <span className="badge estimate" title="Guessed from the photo — weigh it and correct the grams">
+            ≈ weight guessed
+          </span>
+        )}
         <span className="ing-kcal">{kcal != null ? `${round(kcal)} kcal` : ""}</span>
       </div>
       <button className="link small" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
@@ -696,6 +739,77 @@ function IngredientRow({
         </div>
       )}
       {ing.note && <p className="muted small ing-note">{ing.note}</p>}
+    </div>
+  );
+}
+
+function PhotoRecipe({
+  meal,
+  onApply,
+  onClose,
+}: {
+  meal: Meal;
+  onApply: (r: RecipeResult) => void;
+  onClose?: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [reply, setReply] = useState("");
+  const [error, setError] = useState("");
+  const prompt = buildRecipePrompt(meal.name, meal.description ?? "");
+
+  async function copy() {
+    setError("");
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("Couldn't access the clipboard — open “Show prompt” and copy it manually.");
+    }
+  }
+
+  function apply() {
+    setError("");
+    try {
+      onApply(parseRecipeReply(reply));
+      setReply("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  return (
+    <div className="photo-recipe">
+      <div className="row photo-recipe-head">
+        <strong>📷 Create from photos</strong>
+        {onClose && <button className="ghost small" onClick={onClose}>Close</button>}
+      </div>
+      <p className="muted small">
+        Photograph the ingredients — packages, the scale display, or everything on the counter. Copy the prompt into
+        your AI chat, attach the photos, then paste the reply here. The AI lists each ingredient with its weight and
+        nutrition.
+      </p>
+      <div className="row wrap-row">
+        <button className="primary" onClick={copy}>{copied ? "Copied ✓" : "Copy prompt"}</button>
+      </div>
+      <details className="prompt-preview">
+        <summary className="small muted">Show prompt</summary>
+        <textarea readOnly value={prompt} rows={10} onFocus={(e) => e.currentTarget.select()} />
+      </details>
+      <textarea
+        className="reply"
+        placeholder="Paste the AI's reply here"
+        rows={4}
+        value={reply}
+        onChange={(e) => setReply(e.target.value)}
+      />
+      <div className="row wrap-row">
+        <button className="primary" onClick={apply} disabled={!reply.trim()}>
+          Add ingredients
+        </button>
+      </div>
+      {error && <p className="error">{error}</p>}
+      {meal.ingredients.length === 0 && <p className="muted small or">…or add ingredients one by one:</p>}
     </div>
   );
 }

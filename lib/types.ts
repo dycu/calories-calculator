@@ -28,6 +28,8 @@ export interface Ingredient {
   note: string;
   /** The user will attach a package / nutrition-label photo in the AI chat. */
   hasPhoto: boolean;
+  /** The weight was guessed by the AI from a photo rather than weighed. */
+  gramsEstimated?: boolean;
 }
 
 export interface Meal {
