@@ -13,7 +13,7 @@ import {
   newMeal,
   previousMeals,
 } from "@/lib/storage";
-import { countOf, formatDate, formatDateTime } from "@/lib/pl";
+import { countOf, formatDate } from "@/lib/pl";
 import { hasSummary, mealSummaryText } from "@/lib/summary";
 import { NUTRIENTS, type Ingredient, type Meal, type NutrientKey, type Source } from "@/lib/types";
 
@@ -194,9 +194,7 @@ export default function Home() {
       </header>
       {notice && <p className="banner small">{notice}</p>}
       {meals.length === 0 && (
-        <p className="muted empty">
-          No meals yet. Add one, list its ingredients with weights, and let the AI work out the calories.
-        </p>
+        <p className="muted empty">Brak posiłków.</p>
       )}
       <ul className="meal-list">
         {meals.map((m) => {
@@ -205,9 +203,7 @@ export default function Home() {
             <li key={m.id} className="meal-row">
               <button className="meal-card" onClick={() => setOpenId(m.id)}>
                 <span className="meal-name">{m.name || "Posiłek bez nazwy"}</span>
-                <span className="muted small">
-                  {formatDate(m.createdAt)} · {countOf(m.ingredients.length, "składnik", "składniki", "składników")}
-                </span>
+                <span className="muted small">{formatDate(m.createdAt)}</span>
                 <span className="meal-kcal">
                   {t.known.has("kcal") ? (
                     <>
@@ -266,12 +262,11 @@ function MealPicker({
           📷 Ze zdjęć
         </button>
       </div>
-      <h2 className="picker-heading">…albo zrób ponownie</h2>
-      <p className="muted small">Kopiuje składniki z ich wartościami odżywczymi. Popraw wagi i zważ gotowy posiłek.</p>
+      <h2 className="picker-heading">Zrób ponownie</h2>
       <input
         className="search"
         type="search"
-        placeholder="Szukaj w swoich posiłkach"
+        placeholder="Szukaj"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
@@ -289,13 +284,13 @@ function MealPicker({
                 <span className="meal-kcal small muted">
                   {t.known.has("kcal") ? `${fmt("kcal", per100gOfMeal(t, "kcal") ?? 0)} kcal/100 g` : ""}
                   <br />
-                  ostatnio {formatDate(m.createdAt)}
+                  {formatDate(m.createdAt)}
                 </span>
               </button>
             </li>
           );
         })}
-        {shown.length === 0 && <p className="muted small">Brak pasujących posiłków.</p>}
+        {shown.length === 0 && <p className="muted small">Brak wyników.</p>}
       </ul>
     </main>
   );
@@ -322,6 +317,7 @@ function MealEditor({
 }) {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [clipFailed, setClipFailed] = useState(false);
   const [reply, setReply] = useState("");
   const [recheckAll, setRecheckAll] = useState(false);
   const [photosOpen, setPhotosOpen] = useState(false);
@@ -415,7 +411,8 @@ function MealEditor({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      setError("Brak dostępu do schowka — rozwiń „Pokaż prompt” i skopiuj go ręcznie.");
+      setClipFailed(true);
+      setError("Brak dostępu do schowka — skopiuj prompt ręcznie.");
     }
   }
 
@@ -466,7 +463,7 @@ function MealEditor({
 
       <input
         className="title-input"
-        placeholder="Nazwa posiłku (np. Curry z kurczakiem)"
+        placeholder="Nazwa posiłku"
         list="previous-meals"
         value={meal.name}
         onChange={(e) => set({ name: e.target.value })}
@@ -479,8 +476,7 @@ function MealEditor({
       {previous && meal.ingredients.length === 0 && (
         <div className="reuse">
           <span className="small">
-            Masz już „{previous.name}” z {formatDate(previous.createdAt)} (
-            {countOf(previous.ingredients.length, "składnik", "składniki", "składników")}).
+            „{previous.name}” z {formatDate(previous.createdAt)}
           </span>
           <button
             className="primary"
@@ -489,24 +485,20 @@ function MealEditor({
               onChange({ ...meal, name, description, ingredients });
             }}
           >
-            Użyj ponownie
+            Wczytaj składniki
           </button>
         </div>
       )}
       <textarea
         className="description"
-        placeholder="Notatki do przepisu (opcjonalnie): jak przygotowane, marki, ile oleju… Zapisują się na później i trafiają do AI."
-        rows={2}
+        placeholder="Notatki (opcjonalnie)"
+        rows={1}
         value={meal.description ?? ""}
         onChange={(e) => set({ description: e.target.value })}
       />
 
       <section className="card">
-        <h2>1. Składniki</h2>
-        <p className="muted small">
-          Zważ każdy składnik, zanim trafi do garnka. Stuknij 📷, jeśli dołączysz w czacie z AI zdjęcie jego etykiety;
-          resztę AI znajdzie w internecie.
-        </p>
+        <h2>Składniki</h2>
         <datalist id="known-ingredients">
           {[...library.values()].map((i) => (
             <option key={i.id} value={i.name} />
@@ -527,18 +519,15 @@ function MealEditor({
           ))}
         </div>
         <div className="row wrap-row">
-          <button onClick={addIngredient}>+ Dodaj składnik</button>
+          <button onClick={addIngredient}>+ Składnik</button>
           {meal.ingredients.length > 0 && !photosOpen && (
-            <button onClick={() => setPhotosOpen(true)}>📷 Dodaj ze zdjęć</button>
+            <button onClick={() => setPhotosOpen(true)}>📷 Ze zdjęć</button>
           )}
         </div>
       </section>
 
       <section className="card">
-        <h2>2. Waga całego posiłku</h2>
-        <p className="muted small">
-          Zważ gotowy posiłek (gotowanie zmienia wagę). Wskazówka: najpierw zważ pusty garnek i odejmij jego wagę.
-        </p>
+        <h2>Waga gotowego posiłku</h2>
         <label className="field">
           <input
             type="number"
@@ -550,32 +539,25 @@ function MealEditor({
           />
           <span>g</span>
         </label>
-        {meal.totalWeight == null && totals.ingredientsWeight > 0 && (
-          <p className="muted small">Nie podano — liczę z sumy składników ({round(totals.ingredientsWeight)} g).</p>
-        )}
       </section>
 
+      {meal.ingredients.length > 0 && (
       <section className="card">
-        <h2>3. Wartości odżywcze</h2>
-        {toAsk.length > 0 ? (
+        <h2>Wartości odżywcze</h2>
+        {toAsk.length > 0 && (
           <>
-            <p className="muted small">
-              Skopiuj prompt do czatu z AI (Claude, ChatGPT… z włączonym wyszukiwaniem w sieci)
-              {toAsk.some((i) => i.hasPhoto) && ", dołącz tam zdjęcia opakowań"}, a potem wklej odpowiedź poniżej.
-            </p>
             <div className="row wrap-row">
               <button className="primary" onClick={copyPrompt}>
-                {copied ? "Skopiowano ✓" : `Kopiuj prompt (${countOf(toAsk.length, "składnik", "składniki", "składników")})`}
+                {copied ? "Skopiowano ✓" : `Kopiuj prompt (${toAsk.length})`}
               </button>
             </div>
-            <details className="prompt-preview">
-              <summary className="small muted">Pokaż prompt</summary>
-              <textarea readOnly value={prompt} rows={10} onFocus={(e) => e.currentTarget.select()} />
-            </details>
+            {clipFailed && (
+              <textarea readOnly value={prompt} rows={8} onFocus={(e) => e.currentTarget.select()} />
+            )}
             <textarea
               className="reply"
-              placeholder="Wklej tutaj odpowiedź AI"
-              rows={4}
+              placeholder="Wklej odpowiedź AI"
+              rows={3}
               value={reply}
               onChange={(e) => setReply(e.target.value)}
             />
@@ -585,33 +567,17 @@ function MealEditor({
               </button>
             </div>
           </>
-        ) : (
-          meal.ingredients.length > 0 && (
-            <p className="muted small">Wszystkie składniki mają komplet wartości. Możesz je poprawić ręcznie albo sprawdzić ponownie.</p>
-          )
         )}
-        <label className="check small recheck">
-          <input type="checkbox" checked={recheckAll} onChange={(e) => setRecheckAll(e.target.checked)} />
-          Sprawdź ponownie wszystkie składniki z AI
-        </label>
+        {meal.ingredients.length > 0 && (
+          <label className="check small recheck">
+            <input type="checkbox" checked={recheckAll} onChange={(e) => setRecheckAll(e.target.checked)} />
+            Sprawdź wszystkie ponownie
+          </label>
+        )}
         {error && <p className="error">{error}</p>}
 
         {totals.known.size > 0 && (
           <>
-            <div className="result">
-              <div className="stat">
-                <span className="stat-value">{fmt("kcal", totals.total.kcal)}</span>
-                <span className="stat-label">kcal razem</span>
-              </div>
-              <div className="stat">
-                <span className="stat-value">{fmt("kcal", per100gOfMeal(totals, "kcal") ?? 0)}</span>
-                <span className="stat-label">kcal / 100 g</span>
-              </div>
-              <div className="stat">
-                <span className="stat-value">{fmt("protein", per100gOfMeal(totals, "protein") ?? 0)}</span>
-                <span className="stat-label">g białka / 100 g</span>
-              </div>
-            </div>
             <table className="nutrition">
               <thead>
                 <tr>
@@ -643,18 +609,16 @@ function MealEditor({
               </tbody>
             </table>
             {[...totals.incomplete].some((k) => totals.known.has(k)) && (
-              <p className="muted small">* Części składników brakuje wagi lub tej wartości, więc wynik jest zaniżony.</p>
+              <p className="muted small">* niepełne dane</p>
             )}
             <div className="row wrap-row">
-              <CopySummaryButton meal={meal} label="📋 Kopiuj tabelę i wagę" />
+              <CopySummaryButton meal={meal} label="📋 Kopiuj tabelę" />
             </div>
           </>
         )}
         {meal.aiNotes && <p className="notes">{meal.aiNotes}</p>}
-        {meal.calculatedAt && (
-          <p className="muted small">Odpowiedź AI zastosowano {formatDateTime(meal.calculatedAt)}</p>
-        )}
       </section>
+      )}
     </main>
   );
 }
@@ -737,18 +701,17 @@ function IngredientRow({
         {ing.source && <span className={`badge ${ing.source}`}>{SOURCE_LABEL[ing.source]}</span>}
         {ing.gramsEstimated && (
           <span className="badge estimate" title="Odgadnięte ze zdjęcia — zważ i popraw gramy">
-            ≈ waga szacowana
+            ≈ waga
           </span>
         )}
         <span className="ing-kcal">{kcal != null ? `${round(kcal)} kcal` : ""}</span>
       </div>
       <button className="link small" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
-        {expanded ? "▾" : "▸"} Wartości na 100 g
-        {!expanded &&
-          (ing.per100g.protein != null || ing.per100g.fat != null || ing.per100g.carbs != null
-            ? ` · B ${fmtIn(ing.per100g.protein)} · T ${fmtIn(ing.per100g.fat)} · W ${fmtIn(ing.per100g.carbs)}`
-            : "")}
-        {missing > 0 && <span className="muted"> (brak: {missing})</span>}
+        {expanded ? "▾" : "▸"}{" "}
+        {ing.per100g.protein != null || ing.per100g.fat != null || ing.per100g.carbs != null
+          ? `B ${fmtIn(ing.per100g.protein)} · T ${fmtIn(ing.per100g.fat)} · W ${fmtIn(ing.per100g.carbs)}`
+          : "Wartości na 100 g"}
+        {missing > 0 && <span className="muted"> · brak {missing}</span>}
       </button>
       {expanded && (
         <div className="nutrient-grid">
@@ -761,7 +724,7 @@ function IngredientRow({
           ))}
         </div>
       )}
-      {ing.note && <p className="muted small ing-note">{ing.note}</p>}
+      {expanded && ing.note && <p className="muted small ing-note">{ing.note}</p>}
     </div>
   );
 }
@@ -776,6 +739,7 @@ function PhotoRecipe({
   onClose?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [clipFailed, setClipFailed] = useState(false);
   const [reply, setReply] = useState("");
   const [error, setError] = useState("");
   const prompt = buildRecipePrompt(meal.name, meal.description ?? "");
@@ -787,7 +751,8 @@ function PhotoRecipe({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      setError("Brak dostępu do schowka — rozwiń „Pokaż prompt” i skopiuj go ręcznie.");
+      setClipFailed(true);
+      setError("Brak dostępu do schowka — skopiuj prompt ręcznie.");
     }
   }
 
@@ -804,25 +769,17 @@ function PhotoRecipe({
   return (
     <div className="photo-recipe">
       <div className="row photo-recipe-head">
-        <strong>📷 Utwórz ze zdjęć</strong>
+        <strong>📷 Ze zdjęć</strong>
         {onClose && <button className="ghost small" onClick={onClose}>Zamknij</button>}
       </div>
-      <p className="muted small">
-        Zrób zdjęcia składników — opakowań, wyświetlacza wagi albo wszystkiego na blacie. Skopiuj prompt do czatu z
-        AI, dołącz zdjęcia, a potem wklej tutaj odpowiedź. AI wypisze każdy składnik z wagą i wartościami
-        odżywczymi.
-      </p>
       <div className="row wrap-row">
         <button className="primary" onClick={copy}>{copied ? "Skopiowano ✓" : "Kopiuj prompt"}</button>
       </div>
-      <details className="prompt-preview">
-        <summary className="small muted">Pokaż prompt</summary>
-        <textarea readOnly value={prompt} rows={10} onFocus={(e) => e.currentTarget.select()} />
-      </details>
+      {clipFailed && <textarea readOnly value={prompt} rows={8} onFocus={(e) => e.currentTarget.select()} />}
       <textarea
         className="reply"
-        placeholder="Wklej tutaj odpowiedź AI"
-        rows={4}
+        placeholder="Wklej odpowiedź AI"
+        rows={3}
         value={reply}
         onChange={(e) => setReply(e.target.value)}
       />
@@ -832,7 +789,6 @@ function PhotoRecipe({
         </button>
       </div>
       {error && <p className="error">{error}</p>}
-      {meal.ingredients.length === 0 && <p className="muted small or">…albo dodawaj składniki pojedynczo:</p>}
     </div>
   );
 }

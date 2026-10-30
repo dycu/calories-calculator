@@ -6,11 +6,11 @@ Aplikacja do zapisywania domowych posiłków i ich pełnych wartości odżywczyc
 2. **Waga całego posiłku** – zważ gotowy posiłek (gotowanie zmienia wagę).
 3. **Wartości odżywcze** – stuknij **Kopiuj prompt**, wklej go do czatu z AI z wyszukiwaniem w sieci (Claude, ChatGPT…), dołącz zdjęcia opakowań, a potem wklej odpowiedź i stuknij **Zastosuj odpowiedź**. Etykiety AI odczytuje ze zdjęć, resztę wyszukuje w internecie (strony producentów i sklepów, tabele składu żywności NIZP PZH / IŻŻ). AI podaje tylko wartości na 100 g; sumy dla całego posiłku i na 100 g liczy aplikacja.
 
-**Posiłek ze zdjęć:** w nowym posiłku (albo przyciskiem **📷 Dodaj ze zdjęć**) skopiuj prompt do czatu z AI i dołącz zdjęcia składników – opakowań, wyświetlacza wagi albo wszystkiego na blacie. Po wklejeniu odpowiedzi składniki dodają się z wagami i wartościami odżywczymi. Wagi, których AI nie odczytało z wagi kuchennej, są oznaczone „≈ waga szacowana”, dopóki nie wpiszesz prawdziwej.
+**Posiłek ze zdjęć:** w nowym posiłku (albo przyciskiem **📷 Ze zdjęć**) skopiuj prompt do czatu z AI i dołącz zdjęcia składników – opakowań, wyświetlacza wagi albo wszystkiego na blacie. Po wklejeniu odpowiedzi składniki dodają się z wagami i wartościami odżywczymi. Wagi, których AI nie odczytało z wagi kuchennej, są oznaczone „≈ waga”, dopóki nie wpiszesz prawdziwej.
 
-**Ponowne robienie posiłku:** stuknij **+ Nowy posiłek** i wybierz wcześniejszy posiłek, wpisz nazwę wcześniejszego posiłku i stuknij **Użyj ponownie** albo stuknij **Zrób ponownie** w otwartym posiłku. Kopiują się notatki, składniki, wagi i wartości odżywcze – popraw wagi i zważ gotowy posiłek.
+**Ponowne robienie posiłku:** stuknij **+ Nowy posiłek** i wybierz wcześniejszy posiłek, wpisz nazwę wcześniejszego posiłku i stuknij **Wczytaj składniki** albo stuknij **Zrób ponownie** w otwartym posiłku. Kopiują się notatki, składniki, wagi i wartości odżywcze – popraw wagi i zważ gotowy posiłek.
 
-**Kopiowanie do AI:** przycisk **📋** przy każdym posiłku na liście (i **📋 Kopiuj tabelę i wagę** w otwartym posiłku) kopiuje tabelę wartości odżywczych – dla całego posiłku i na 100 g – razem z wagą całości, jako zwykły tekst do wklejenia w czacie z AI.
+**Kopiowanie do AI:** przycisk **📋** przy każdym posiłku na liście (i **📋 Kopiuj tabelę** w otwartym posiłku) kopiuje tabelę wartości odżywczych – dla całego posiłku i na 100 g – razem z wagą całości, jako zwykły tekst do wklejenia w czacie z AI.
 
 Aplikacja jest chroniona hasłem, a posiłki są zapisywane na serwerze w bazie Upstash Redis, więc są takie same na każdym urządzeniu.
 
